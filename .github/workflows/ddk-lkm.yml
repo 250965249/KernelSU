@@ -39,6 +39,11 @@ jobs:
     steps:
     - name: Checkout source code
       uses: actions/checkout@v7
+      with:
+        # Branch tip, not the frozen github.sha: the sync job just pushed the
+        # merge result, and this build must reflect it.
+        ref: ${{ github.ref_name }}
+        fetch-depth: 0
 
     - name: Build kernelsu.ko
       env:
@@ -65,7 +70,13 @@ jobs:
         if [ "${{ github.event_name }}" = "pull_request" ]; then
           EXTRA_ARGS="$EXTRA_ARGS KSU_IS_PR_BUILD=1"
         fi
-        CONFIG_KSU=m CC=clang make $EXTRA_ARGS
+        # Samsung targets: the three Samsung macros are required or the KDP /
+        # DEFEX / RKP-no-patch code paths are compiled out (producing a plain
+        # KernelSU that reports "not installed" in the manager). This tree's
+        # no-patch macro is CONFIG_KSU_RKP_NO_PATCH_TEXT (there is no separate
+        # CONFIG_KSU_SAMSUNG_RKP macro; the RKP fallback lives in
+        # syscall_hook_manager.c), so this is a three-macro build, not four.
+        CONFIG_KSU=m CONFIG_KSU_SAMSUNG_KDP=y CONFIG_KSU_SAMSUNG_DEFEX=y CONFIG_KSU_RKP_NO_PATCH_TEXT=y CC=clang make $EXTRA_ARGS
         
         echo "=== Build completed ==="
 

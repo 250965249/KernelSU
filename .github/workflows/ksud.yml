@@ -13,12 +13,21 @@ on:
         required: false
         type: boolean
         default: false
+      # Optional: upstream repo whose version tags (v*) must be visible to
+      # `git describe` at build time, so the VERSION_NAME this binary embeds
+      # matches the one the producer's release job computes. Empty (default)
+      # keeps the historical behaviour for the manager builds.
+      upstream_repo:
+        required: false
+        type: string
+        default: ''
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
       with:
+        ref: ${{ github.ref_name }}
         fetch-depth: 0
 
     - name: Download artifacts
@@ -27,7 +36,17 @@ jobs:
     - name: Prepare LKM files
       if: ${{ inputs.pack_lkm }}
       run: |
-        cp aarch64-android*-lkm/*_kernelsu.ko ./userspace/ksud/bin/aarch64/
+        # Samsung late-load selects the `-exynos` asset when KSUD_TREE=exynos
+        # (userspace/ksud/src/late_load.rs: `{kmi}-exynos_kernelsu.ko`), while
+        # boot-image patching / KMI listing use the plain `{kmi}_kernelsu.ko`.
+        # Ship both names from the same Samsung-built module so every code path
+        # resolves byte-identically.
+        for ko in aarch64-android*-lkm/*_kernelsu.ko; do
+          base="$(basename "$ko")"
+          kmi="${base%_kernelsu.ko}"
+          cp "$ko" "./userspace/ksud/bin/aarch64/$base"
+          cp "$ko" "./userspace/ksud/bin/aarch64/${kmi}-exynos_kernelsu.ko"
+        done
         cp x86_64-android*-lkm/*_kernelsu.ko ./userspace/ksud/bin/x86_64/
     
     - name: Prepare ksuinit
@@ -55,6 +74,25 @@ jobs:
       id: setup-ndk
       with:
         ndk-version: r29
+
+    - name: Normalize tags for version stamping
+      run: |
+        # Fork release tags (`latest-ksud`, `manager-ci`) sit on HEAD, and
+        # `git describe --tags` always prefers the nearest tag, which turned ksud's
+        # VERSION_NAME into `latest-ksud-6-g4f74a450`. Keeping only real version
+        # tags makes the stamp match upstream CI's naming.
+        git tag -l | grep -Ev '^v[0-9]' | xargs -r git tag -d >/dev/null || true
+
+    - name: Fetch upstream version tags for version stamping
+      if: ${{ inputs.upstream_repo != '' }}
+      run: |
+        # A GITHUB_TOKEN push of a tag whose commit touches .github/workflows is
+        # rejected without `workflows` permission, so the fork cannot carry
+        # upstream version tags and a plain origin clone would only see stale
+        # ones. Fetch the upstream v* tags directly here so the VERSION_NAME
+        # build.rs embeds via `git describe` matches the release job, which
+        # fetches the same set before stamping the sidecar.
+        git fetch --tags --force "${{ inputs.upstream_repo }}" 'refs/tags/v*:refs/tags/v*'
 
     - name: Build ksud
       env:
