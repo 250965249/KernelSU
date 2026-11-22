@@ -7,7 +7,7 @@ use log::{LevelFilter, error, info};
 
 use crate::boot_patch::{BootPatchArgs, BootRestoreArgs};
 use crate::lkm_image::BootPatchV2Args;
-use crate::module::regenerate_preinit_rc;
+use crate::module::regenerate_preinit;
 use crate::{
     apk_sign, assets, debug, defs, init_event, ksu_uapi, ksucalls, module, module_config, sulog,
     utils,
@@ -333,6 +333,12 @@ enum Module {
     /// list all modules
     List,
 
+    /// preinit actions run before SELinux policy is loaded
+    Preinit {
+        #[command(subcommand)]
+        command: PreinitCmd,
+    },
+
     /// manage module configuration
     Config {
         /// target internal module name (resolved as internal.<name>)
@@ -341,6 +347,14 @@ enum Module {
         #[command(subcommand)]
         command: ModuleConfigCmd,
     },
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum PreinitCmd {
+    /// show per-module preinit state for the next boot
+    Status,
+    /// re-enable preinit after it was disabled by repeated failed boots
+    Reset,
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -497,7 +511,7 @@ enum UmountOp {
 
 #[derive(clap::Subcommand, Debug)]
 enum Initrc {
-    /// Regenerate preinit rc file
+    /// Regenerate preinit rc file and preinit dirs
     Refresh,
 }
 
@@ -546,6 +560,13 @@ pub fn run() -> Result<()> {
                 Module::Disable { id } => module::disable_module(&id),
                 Module::Action { id } => module::run_action(&id),
                 Module::List => module::list_modules(),
+                Module::Preinit { command } => match command {
+                    PreinitCmd::Status => {
+                        crate::preinit::print_status();
+                        Ok(())
+                    }
+                    PreinitCmd::Reset => crate::preinit::reset_bootcount(),
+                },
                 Module::Config { internal, command } => {
                     let module_id = match internal {
                         Some(internal_name) => format!("internal.{internal_name}"),
@@ -697,13 +718,13 @@ pub fn run() -> Result<()> {
         }
         Commands::Sulogd => sulog::run_sulogd(),
         Commands::Profile { command } => match command {
-            Profile::GetSepolicy { package } => crate::profile::get_sepolicy(package),
+            Profile::GetSepolicy { package } => crate::profile::get_sepolicy(&package),
             Profile::SetSepolicy { package, policy } => {
-                crate::profile::set_sepolicy(package, policy)
+                crate::profile::set_sepolicy(&package, policy)
             }
-            Profile::GetTemplate { id } => crate::profile::get_template(id),
-            Profile::SetTemplate { id, template } => crate::profile::set_template(id, template),
-            Profile::DeleteTemplate { id } => crate::profile::delete_template(id),
+            Profile::GetTemplate { id } => crate::profile::get_template(&id),
+            Profile::SetTemplate { id, template } => crate::profile::set_template(&id, template),
+            Profile::DeleteTemplate { id } => crate::profile::delete_template(&id),
             Profile::ListTemplates => crate::profile::list_templates(),
         },
 
@@ -837,7 +858,7 @@ pub fn run() -> Result<()> {
             }
         },
         Commands::Initrc { command } => match command {
-            Initrc::Refresh => regenerate_preinit_rc(),
+            Initrc::Refresh => regenerate_preinit(),
         },
     };
 
