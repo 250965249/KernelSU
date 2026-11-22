@@ -43,7 +43,7 @@ env:
   BRANCH: samsung
   # Files the samsung delta owns. A conflict confined to these is
   # auto-resolved in our favour; anything else fails loudly.
-  SAMSUNG_OWNED: "kernel/Kbuild kernel/core/init.c kernel/feature/selinux_hide.c kernel/feature/sucompat.c kernel/hook/arm64/patch_memory.c kernel/hook/arm64/syscall_hook.c kernel/hook/arm64/syscall_hook.h kernel/hook/syscall_hook_manager.c kernel/hook/tp_marker.c kernel/policy/app_profile.c kernel/include/ksu_samsung_kdp.h kernel/compat/samsung_kdp.c kernel/compat/samsung_defex.c kernel/compat/samsung_defex.h userspace/ksud/src/cli.rs userspace/ksud/src/late_load.rs userspace/ksud/src/module.rs userspace/ksud/src/restorecon.rs userspace/ksud/src/soft_reboot.rs userspace/ksud/src/utils.rs"
+  SAMSUNG_OWNED: "kernel/Kbuild kernel/core/init.c kernel/feature/selinux_hide.c kernel/feature/sucompat.c kernel/hook/arm64/patch_memory.c kernel/hook/arm64/syscall_hook.c kernel/hook/arm64/syscall_hook.h kernel/hook/syscall_hook_manager.c kernel/hook/x86_64/syscall_hook.c kernel/hook/tp_marker.c kernel/policy/app_profile.c kernel/include/ksu_samsung_kdp.h kernel/compat/samsung_kdp.c kernel/compat/samsung_defex.c kernel/compat/samsung_defex.h userspace/ksud/src/cli.rs userspace/ksud/src/late_load.rs userspace/ksud/src/module.rs userspace/ksud/src/restorecon.rs userspace/ksud/src/soft_reboot.rs userspace/ksud/src/utils.rs"
   # Conflicts under these prefixes are resolved in our
   # favour too: they are not part of the ksud payload.
   PAYLOAD_IRRELEVANT_PREFIXES: "manager/ .github/workflows/ website/ js/ docs/ fastlane/"
